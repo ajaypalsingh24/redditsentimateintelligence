@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Reddit Thread Tracker</title>
+    <link rel="stylesheet" href="{{ url_for('static', path='/styles.css') }}">
+  </head>
+  <body>
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">Serper Reddit Monitoring</p>
+        <h1>{{ brand.name }}</h1>
+      </div>
+      <form action="/scan" method="post">
+        <button class="primary" type="submit">Run Scan</button>
+      </form>
+    </header>
+
+    {% if not settings.serper_api_key or settings.serper_api_key == "place_your_serper_api_key_here" %}
+      <section class="notice">
+        Add <strong>SERPER_API_KEY</strong> to your <strong>.env</strong> file before running scans.
+      </section>
+    {% endif %}
+
+    <main>
+      <section class="metrics">
+        <article>
+          <span>Total mentions</span>
+          <strong>{{ total_mentions }}</strong>
+        </article>
+        <article>
+          <span>Negative mentions</span>
+          <strong>{{ negative_mentions }}</strong>
+        </article>
+        <article>
+          <span>Last scan</span>
+          <strong>{{ latest_scan.status if latest_scan else "Not run" }}</strong>
+        </article>
+      </section>
+
+      <section class="panel settings">
+        <form action="/brands" method="post">
+          <label for="brand-name">Brand</label>
+          <div class="inline-form">
+            <input id="brand-name" name="name" value="{{ brand.name }}" required>
+            <button type="submit">Save</button>
+          </div>
+        </form>
+
+        <form action="/keywords" method="post">
+          <label for="phrase">Keyword</label>
+          <div class="inline-form">
+            <input id="phrase" name="phrase" placeholder="Example: brand complaint reddit" required>
+            <button type="submit">Add</button>
+          </div>
+        </form>
+      </section>
+
+      <section class="panel">
+        <div class="section-head">
+          <h2>Tracked Keywords</h2>
+        </div>
+        <div class="keyword-list">
+          {% for keyword in keywords %}
+            <form action="/keywords/{{ keyword.id }}/toggle" method="post">
+              <button class="{{ 'active' if keyword.is_active else 'inactive' }}" type="submit">
+                {{ keyword.phrase }}
+              </button>
+            </form>
+          {% endfor %}
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="section-head">
+          <h2>Mentions</h2>
+          <nav class="filters">
+            <a class="{{ 'selected' if sentiment_filter == 'all' else '' }}" href="/?sentiment=all">All</a>
+            <a class="{{ 'selected' if sentiment_filter == 'negative' else '' }}" href="/?sentiment=negative">Negative</a>
+            <a class="{{ 'selected' if sentiment_filter == 'neutral' else '' }}" href="/?sentiment=neutral">Neutral</a>
+            <a class="{{ 'selected' if sentiment_filter == 'positive' else '' }}" href="/?sentiment=positive">Positive</a>
+          </nav>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Sentiment</th>
+                <th>Severity</th>
+                <th>Reddit result</th>
+                <th>Subreddit</th>
+                <th>Found</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for mention in mentions %}
+                <tr>
+                  <td><span class="badge {{ mention.sentiment }}">{{ mention.sentiment }}</span></td>
+                  <td>{{ mention.severity }}</td>
+                  <td>
+                    <a class="result-title" href="{{ mention.url }}" target="_blank" rel="noreferrer">{{ mention.title }}</a>
+                    <p>{{ mention.snippet }}</p>
+                  </td>
+                  <td>{{ mention.subreddit or "-" }}</td>
+                  <td>{{ mention.created_at.strftime("%Y-%m-%d %H:%M") }}</td>
+                </tr>
+              {% else %}
+                <tr>
+                  <td colspan="5" class="empty">No mentions yet. Add your Serper key, then run a scan.</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="section-head">
+          <h2>Scan History</h2>
+        </div>
+        <div class="scan-grid">
+          {% for scan in scan_runs %}
+            <article class="scan {{ scan.status }}">
+              <strong>{{ scan.status }}</strong>
+              <span>{{ scan.results_found }} new, {{ scan.negative_found }} negative</span>
+              {% if scan.error_message %}
+                <p>{{ scan.error_message }}</p>
+              {% endif %}
+            </article>
+          {% else %}
+            <p class="empty">No scans have run yet.</p>
+          {% endfor %}
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

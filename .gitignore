@@ -1,0 +1,6 @@
+__pycache__/
+*.py[cod]
+.venv/
+.env
+reddit_tracker.db
+.pytest_cache/

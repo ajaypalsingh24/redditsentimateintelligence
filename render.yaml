@@ -1,0 +1,31 @@
+services:
+  - type: web
+    name: reddit-thread-tracker
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: SERPER_API_KEY
+        sync: false
+      - key: ALERT_WEBHOOK_URL
+        sync: false
+      - key: ALERT_SECRET
+        sync: false
+
+  - type: cron
+    name: reddit-thread-tracker-scan
+    runtime: python
+    plan: free
+    schedule: "0 * * * *"
+    buildCommand: pip install -r requirements.txt
+    startCommand: python -m app.cron_scan
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: SERPER_API_KEY
+        sync: false
+      - key: ALERT_WEBHOOK_URL
+        sync: false
