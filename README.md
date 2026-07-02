@@ -13,7 +13,7 @@ A FastAPI web app that tracks Reddit mentions for a brand using Serper Google Se
 
 ## Local Setup
 
-This project is pinned to Python 3.12 for Render deployment.
+This project is pinned to Python 3.12 for Render deployment with `.python-version` and `PYTHON_VERSION`.
 
 1. Create a virtual environment:
 
