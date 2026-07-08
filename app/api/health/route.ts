@@ -3,5 +3,5 @@ import { NextResponse } from "next/server";
 export const dynamic = "force-dynamic";
 
 export function GET() {
-  return NextResponse.json({ ok: true, name: "Reddit Negative Thread Tracker" });
+  return NextResponse.json({ ok: true, name: "Reddit Brand Sentiment Dashboard" });
 }

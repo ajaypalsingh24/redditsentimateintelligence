@@ -1,6 +1,8 @@
 node_modules/
+.venv/
 .next/
 out/
+data/
 .env
 .env*.local
 *.log

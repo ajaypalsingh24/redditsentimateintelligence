@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Reddit Negative Thread Tracker",
-  description: "Monitor negative Reddit mentions for brands using SerpApi, OpenAI, Neon, and email alerts.",
+  title: "Reddify Sentiment Intelligence",
+  description: "Track Reddit sentiment, scan history, project dashboards, and export-ready reports.",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

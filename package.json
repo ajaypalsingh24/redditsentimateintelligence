@@ -1,21 +1,23 @@
 {
-  "name": "reddit-negative-thread-tracker",
+  "name": "reddit-brand-sentiment-dashboard",
   "version": "1.0.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "prisma generate && next build",
+    "build": "next build",
     "start": "next start -H 0.0.0.0",
-    "prisma:generate": "prisma generate",
-    "prisma:migrate": "prisma migrate dev",
-    "prisma:deploy": "prisma db push",
-    "prisma:studio": "prisma studio",
     "render:cron": "node scripts/render-cron.mjs",
+    "migrate:neon": "node scripts/migrate-json-to-neon.mjs",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@prisma/client": "6.19.3",
+    "@neondatabase/serverless": "^1.1.0",
+    "@types/nodemailer": "^8.0.1",
+    "@types/pdfkit": "^0.17.6",
+    "exceljs": "^4.4.0",
     "next": "16.2.10",
+    "nodemailer": "^9.0.3",
+    "pdfkit": "^0.19.1",
     "react": "19.2.7",
     "react-dom": "19.2.7"
   },
@@ -24,7 +26,6 @@
     "@types/node": "24.10.2",
     "@types/react": "19.2.7",
     "@types/react-dom": "19.2.3",
-    "prisma": "6.19.3",
     "tailwindcss": "4.3.2",
     "typescript": "5.9.3"
   },
