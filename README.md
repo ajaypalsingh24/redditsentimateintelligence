@@ -4,6 +4,7 @@ Client-facing Reddit sentiment dashboard using:
 
 - Google SerpApi
 - OpenAI API
+- Apify Reddit Scraper for manual Reddit URL scraping
 - Neon PostgreSQL
 - Optional Resend or SMTP for direct PDF emails
 
@@ -21,6 +22,7 @@ No Reddit API is required. The app finds public Reddit URLs from Google, stores 
 - Keeps Reddit account URLs as manual references only
 - Shows opportunity-only threads separately when the brand is not mentioned
 - Exports client-ready PDFs and can email generated PDF reports
+- Scrapes a specific Reddit URL through a backend-only Apify route when deeper post/comment data is needed
 
 ## Required Environment Variables
 
@@ -29,6 +31,7 @@ DATABASE_URL=
 SERPAPI_API_KEY=
 OPENAI_API_KEY=
 OPENAI_MODEL=gpt-4.1-mini
+APIFY_API_TOKEN=
 CRON_SECRET=
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 DASHBOARD_PASSWORD=
@@ -63,6 +66,7 @@ EMAIL_FROM="Reddify Reports <reports@yourdomain.com>"
 4. If the brand is mentioned, OpenAI classifies sentiment and the URL counts in the sentiment score.
 5. If the brand is not mentioned but the topic/competitor context is relevant, the URL is stored only as an opportunity.
 6. The dashboard reports sentiment, opportunity gaps, scan snapshots, and actions.
+7. Use the `Apify Scraper` tab to scrape one Reddit URL through `/api/reddit-scrape`; the Apify token stays on the backend.
 
 ## What This Version Does Not Do
 

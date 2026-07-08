@@ -1,5 +1,6 @@
 import { createBrand, deleteBrand, emailReportPdf, logout, runManualScan, updateBrand } from "@/app/actions";
 import { ExportMenu } from "@/app/components/ExportPdfButton";
+import { RedditScraperPanel } from "@/app/components/RedditScraperPanel";
 import { requireAuth } from "@/lib/auth";
 import { getRedditAccountReference } from "@/lib/reddit";
 import {
@@ -20,13 +21,14 @@ import { BrandRecord, MentionRecord, ScanRunRecord, getBrandsWithMentions } from
 
 export const dynamic = "force-dynamic";
 
-type TabKey = "overview" | "sentiment" | "opportunities" | "threads" | "account" | "settings";
+type TabKey = "overview" | "sentiment" | "opportunities" | "threads" | "scraper" | "account" | "settings";
 
 const tabs: Array<{ key: TabKey; label: string; helper: string }> = [
   { key: "overview", label: "Overview", helper: "Summary, trends, and score" },
   { key: "sentiment", label: "Sentiment", helper: "Brand-mentioned threads only" },
   { key: "opportunities", label: "Opportunities", helper: "Brand-absent visibility gaps" },
   { key: "threads", label: "Threads", helper: "URLs, summaries, and actions" },
+  { key: "scraper", label: "Apify Scraper", helper: "Manual Reddit URL scrape" },
   { key: "account", label: "Brand Account", helper: "Reddit profile reference" },
   { key: "settings", label: "Projects", helper: "Setup and saved projects" },
 ];
@@ -409,6 +411,7 @@ export default async function DashboardPage({ searchParams }: { searchParams?: P
             {activeTab === "sentiment" ? <SentimentTab mentions={sentimentMentions} stats={stats} themes={themes} brand={brand} /> : null}
             {activeTab === "opportunities" ? <OpportunitiesTab brand={brand} mentions={opportunityThreads} subreddits={subreddits} /> : null}
             {activeTab === "threads" ? <ThreadsTab sentimentMentions={sentimentMentions} opportunityMentions={opportunityThreads} brand={brand} /> : null}
+            {activeTab === "scraper" ? <RedditScraperPanel /> : null}
             {activeTab === "account" ? <AccountTab accounts={accounts} /> : null}
             {activeTab === "settings" ? <SettingsTab brands={brands} brand={brand} /> : null}
 
