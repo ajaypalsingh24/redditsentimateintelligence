@@ -454,6 +454,45 @@ export async function findMentionByUrl(url: string) {
   return store.mentions.find((mention) => mention.url === url) || null;
 }
 
+export async function updateMention(data: MentionRecord) {
+  const mention: MentionRecord = {
+    ...data,
+    updatedAt: new Date(),
+  };
+
+  if (await useDatabase()) {
+    await sql!`
+      UPDATE sentiment_mentions SET
+        title = ${mention.title},
+        display_link = ${mention.displayLink || null},
+        subreddit = ${mention.subreddit},
+        author = ${mention.author},
+        upvotes = ${mention.upvotes ?? null},
+        comment_count = ${mention.commentCount ?? null},
+        post_date_label = ${mention.postDateLabel},
+        snippet = ${mention.snippet},
+        source_query = ${mention.sourceQuery},
+        sentiment = ${mention.sentiment},
+        confidence = ${mention.confidence},
+        risk_score = ${mention.riskScore},
+        reason = ${mention.reason},
+        themes = ${JSON.stringify(mention.themes)}::jsonb,
+        opportunity_type = ${mention.opportunityType},
+        recommended_action = ${mention.recommendedAction},
+        is_brand_mentioned = ${mention.isBrandMentioned},
+        is_urgent = ${mention.isUrgent},
+        updated_at = ${mention.updatedAt.toISOString()}
+      WHERE id = ${mention.id}
+    `;
+    return mention;
+  }
+
+  const store = await readJsonStore();
+  store.mentions = store.mentions.map((item) => (item.id === mention.id ? mention : item));
+  await writeJsonStore(store);
+  return mention;
+}
+
 export async function createMention(data: Omit<MentionRecord, "id" | "createdAt" | "updatedAt" | "detectedAt">) {
   const now = new Date();
   const mention: MentionRecord = {

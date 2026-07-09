@@ -1,7 +1,7 @@
 import { buildScrapedContext, scrapeRedditUrlWithApify } from "@/lib/apify";
 import { classifyMention } from "@/lib/sentiment";
-import { buildBrandQueries, isBrandMentioned, isRelevantOpportunity, searchRedditWithSerpApi } from "@/lib/serpapi";
-import { createMention, createScanRun, findMentionByUrl, getActiveBrands, MentionRecord } from "@/lib/store";
+import { buildBrandQueries, isBrandMentioned, isRelevantOpportunity, searchRedditWithSerpApi, SerpMentionResult } from "@/lib/serpapi";
+import { BrandRecord, createMention, createScanRun, findMentionByUrl, getActiveBrands, MentionRecord, updateMention } from "@/lib/store";
 
 const MAX_QUERIES_PER_BRAND = 8;
 const MAX_RESULTS_PER_QUERY = 5;
@@ -17,6 +17,86 @@ export type ScanSummary = {
   alertsSent: number;
   errors: string[];
 };
+
+async function buildMentionData(
+  brand: BrandRecord,
+  result: SerpMentionResult,
+  brandMentioned: boolean,
+  brandAliases: string[],
+  summary: ScanSummary,
+  scanErrors: string[],
+  shouldEnrich: boolean,
+) {
+  let enrichedTitle = result.title;
+  let enrichedSnippet = result.snippet;
+  let enrichedSubreddit = result.subreddit;
+  let enrichedAuthor = "";
+  let enrichedUpvotes: number | null = null;
+  let enrichedCommentCount: number | null = null;
+  let enrichedPostDateLabel = "";
+
+  if (shouldEnrich && process.env.APIFY_API_TOKEN) {
+    try {
+      const scraped = await scrapeRedditUrlWithApify(result.url);
+      const context = buildScrapedContext(scraped.items);
+      enrichedTitle = context.title || enrichedTitle;
+      enrichedSnippet = context.text || enrichedSnippet;
+      enrichedSubreddit = context.subreddit || enrichedSubreddit;
+      enrichedAuthor = context.author;
+      enrichedUpvotes = context.score;
+      enrichedCommentCount = context.commentsCount;
+      enrichedPostDateLabel = context.createdAt;
+    } catch (error) {
+      const message = `${brand.name}: Apify enrich failed for ${result.url}: ${error instanceof Error ? error.message : "Unknown error"}`;
+      summary.errors.push(message);
+      scanErrors.push(message);
+    }
+  }
+
+  const enrichedResult = {
+    ...result,
+    title: enrichedTitle,
+    snippet: enrichedSnippet,
+    subreddit: enrichedSubreddit,
+  };
+
+  const enrichedBrandMentioned = isBrandMentioned(enrichedResult, brand.name, brandAliases);
+  const finalBrandMentioned = brandMentioned || enrichedBrandMentioned;
+
+  const classification = finalBrandMentioned
+    ? await classifyMention(enrichedTitle, enrichedSnippet, brand.name)
+    : {
+        sentiment: "not-applicable" as const,
+        confidence: 0,
+        risk_score: 1,
+        reason: "Brand is not mentioned in this Reddit result. Store as an opportunity only, not sentiment.",
+        themes: ["visibility gap", "opportunity"],
+        opportunity_type: "answer-opportunity" as const,
+        recommended_action: "monitor" as const,
+      };
+
+  return {
+    title: enrichedTitle.slice(0, 500),
+    url: result.url,
+    displayLink: result.displayLink,
+    subreddit: enrichedSubreddit,
+    author: enrichedAuthor,
+    upvotes: enrichedUpvotes,
+    commentCount: enrichedCommentCount,
+    postDateLabel: enrichedPostDateLabel,
+    snippet: enrichedSnippet,
+    sourceQuery: result.sourceQuery,
+    sentiment: classification.sentiment,
+    confidence: classification.confidence,
+    riskScore: classification.risk_score,
+    reason: classification.reason,
+    themes: classification.themes,
+    opportunityType: classification.opportunity_type,
+    recommendedAction: classification.recommended_action,
+    isBrandMentioned: finalBrandMentioned,
+    isUrgent: classification.sentiment === "negative" && classification.risk_score >= 8,
+  };
+}
 
 export async function scanBrands(brandId?: string): Promise<ScanSummary> {
   const summary: ScanSummary = {
@@ -81,88 +161,31 @@ export async function scanBrands(brandId?: string): Promise<ScanSummary> {
           }
 
           const existing = await findMentionByUrl(result.url);
-          if (existing) {
-            scanMentions.push(existing);
-            continue;
+          const shouldEnrich = apifyEnrichments < MAX_APIFY_ENRICHMENTS_PER_BRAND;
+          if (shouldEnrich && process.env.APIFY_API_TOKEN) {
+            apifyEnrichments += 1;
           }
 
-          if (brandNewMentions >= MAX_NEW_MENTIONS_PER_BRAND) {
-            continue;
+          const mentionData = await buildMentionData(brand, result, brandMentioned, brandAliases, summary, scanErrors, shouldEnrich);
+          const mention = existing
+            ? await updateMention({
+                ...existing,
+                ...mentionData,
+                brandId: existing.brandId,
+                url: existing.url,
+                detectedAt: existing.detectedAt,
+                createdAt: existing.createdAt,
+                updatedAt: existing.updatedAt,
+              })
+            : await createMention({
+                brandId: brand.id,
+                ...mentionData,
+              });
+
+          if (!existing) {
+            summary.newMentions += 1;
+            brandNewMentions += 1;
           }
-
-          let enrichedTitle = result.title;
-          let enrichedSnippet = result.snippet;
-          let enrichedSubreddit = result.subreddit;
-          let enrichedAuthor = "";
-          let enrichedUpvotes: number | null = null;
-          let enrichedCommentCount: number | null = null;
-          let enrichedPostDateLabel = "";
-
-          if (apifyEnrichments < MAX_APIFY_ENRICHMENTS_PER_BRAND && process.env.APIFY_API_TOKEN) {
-            try {
-              apifyEnrichments += 1;
-              const scraped = await scrapeRedditUrlWithApify(result.url);
-              const context = buildScrapedContext(scraped.items);
-              enrichedTitle = context.title || enrichedTitle;
-              enrichedSnippet = context.text || enrichedSnippet;
-              enrichedSubreddit = context.subreddit || enrichedSubreddit;
-              enrichedAuthor = context.author;
-              enrichedUpvotes = context.score;
-              enrichedCommentCount = context.commentsCount;
-              enrichedPostDateLabel = context.createdAt;
-            } catch (error) {
-              const message = `${brand.name}: Apify enrich failed for ${result.url}: ${error instanceof Error ? error.message : "Unknown error"}`;
-              summary.errors.push(message);
-              scanErrors.push(message);
-            }
-          }
-
-          const enrichedResult = {
-            ...result,
-            title: enrichedTitle,
-            snippet: enrichedSnippet,
-            subreddit: enrichedSubreddit,
-          };
-
-          const enrichedBrandMentioned = isBrandMentioned(enrichedResult, brand.name, brandAliases);
-          const finalBrandMentioned = brandMentioned || enrichedBrandMentioned;
-
-          const classification = finalBrandMentioned
-            ? await classifyMention(enrichedTitle, enrichedSnippet, brand.name)
-            : {
-                sentiment: "not-applicable" as const,
-                confidence: 0,
-                risk_score: 1,
-                reason: "Brand is not mentioned in this Reddit result. Store as an opportunity only, not sentiment.",
-                themes: ["visibility gap", "opportunity"],
-                opportunity_type: "answer-opportunity" as const,
-                recommended_action: "monitor" as const,
-              };
-          const mention = await createMention({
-            brandId: brand.id,
-            title: enrichedTitle.slice(0, 500),
-            url: result.url,
-            displayLink: result.displayLink,
-            subreddit: enrichedSubreddit,
-            author: enrichedAuthor,
-            upvotes: enrichedUpvotes,
-            commentCount: enrichedCommentCount,
-            postDateLabel: enrichedPostDateLabel,
-            snippet: enrichedSnippet,
-            sourceQuery: result.sourceQuery,
-            sentiment: classification.sentiment,
-            confidence: classification.confidence,
-            riskScore: classification.risk_score,
-            reason: classification.reason,
-            themes: classification.themes,
-            opportunityType: classification.opportunity_type,
-            recommendedAction: classification.recommended_action,
-            isBrandMentioned: finalBrandMentioned,
-            isUrgent: classification.sentiment === "negative" && classification.risk_score >= 8,
-          });
-
-          summary.newMentions += 1;
-          brandNewMentions += 1;
 
           if (mention.isBrandMentioned && mention.sentiment === "negative") {
             summary.negativeMentions += 1;
