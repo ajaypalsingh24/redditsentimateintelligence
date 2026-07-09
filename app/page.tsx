@@ -146,6 +146,8 @@ export default async function DashboardPage({ searchParams }: { searchParams?: P
   const queryBase = `project=${brand?.id || ""}${scanQuery}&${themeQuery}`;
   const themeBase = `project=${brand?.id || ""}${scanQuery}&tab=${activeTab}`;
   const excelHref = `/api/export/excel?project=${brand?.id || ""}${selectedScanRun ? `&scan=${selectedScanRun.id}` : ""}`;
+  const latestScanErrors = scanRuns[0]?.errors || [];
+  const hasApifyScanError = latestScanErrors.some((error) => error.toLowerCase().includes("apify"));
   return (
     <main className={`min-h-screen app-shell ${themeClass(theme)} text-slate-950`}>
       <div className="grid min-h-screen lg:grid-cols-[300px_1fr]">
@@ -243,8 +245,12 @@ export default async function DashboardPage({ searchParams }: { searchParams?: P
 
           {params.scan === "error" ? (
             <section className="mb-5 rounded-xl border border-red-200 bg-red-50 p-4 text-red-900">
-              <p className="text-sm font-bold">Scan finished with errors.</p>
-              <p className="mt-1 text-sm leading-6">Check that the project has keywords and that the SerpApi key is configured correctly.</p>
+              <p className="text-sm font-bold">{hasApifyScanError ? "Scan finished using fallback data." : "Scan finished with errors."}</p>
+              <p className="mt-1 text-sm leading-6">
+                {hasApifyScanError
+                  ? "SerpApi and OpenAI still updated the report, but Apify Reddit enrichment is blocked. Activate/rent the Apify actor to collect full post and comment data."
+                  : "Check that the project has keywords and that the SerpApi key is configured correctly."}
+              </p>
             </section>
           ) : null}
 
