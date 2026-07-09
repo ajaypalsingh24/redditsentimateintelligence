@@ -135,12 +135,7 @@ export default async function DashboardPage({ searchParams }: { searchParams?: P
   const strategy = brand ? strategicActionOverview(brand, sentimentMentions) : null;
   const plan = brand ? actionPlan(brand, selectedMentions).slice(0, 5) : [];
   const accounts = brand ? (brand.brandAccounts || []).map((account) => getRedditAccountReference(account)) : [];
-  const opportunityThreads = selectedMentions
-    .filter(
-      (mention) =>
-        mention.isBrandMentioned === false || mention.sentiment === "neutral" || mention.opportunityType === "answer-opportunity",
-    )
-    .slice(0, 20);
+  const opportunityThreads = opportunityOnlyMentions.slice(0, 20);
   const themeQuery = `theme=${theme}`;
   const scanQuery = selectedScanRun ? `&scan=${selectedScanRun.id}` : "";
   const queryBase = `project=${brand?.id || ""}${scanQuery}&${themeQuery}`;

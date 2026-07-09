@@ -47,7 +47,7 @@ async function createSchema() {
       id TEXT PRIMARY KEY,
       brand_id TEXT NOT NULL REFERENCES sentiment_brands(id) ON DELETE CASCADE,
       title TEXT NOT NULL,
-      url TEXT NOT NULL UNIQUE,
+      url TEXT NOT NULL,
       display_link TEXT,
       subreddit TEXT NOT NULL DEFAULT '',
       author TEXT NOT NULL DEFAULT '',
@@ -128,7 +128,9 @@ async function createSchema() {
   await sql`ALTER TABLE sentiment_mentions ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT now()`;
 
   await sql`CREATE INDEX IF NOT EXISTS mentions_brand_id_idx ON sentiment_mentions(brand_id)`;
-  await sql`CREATE UNIQUE INDEX IF NOT EXISTS mentions_url_unique_idx ON sentiment_mentions(url)`;
+  await sql`ALTER TABLE sentiment_mentions DROP CONSTRAINT IF EXISTS sentiment_mentions_url_key`;
+  await sql`DROP INDEX IF EXISTS mentions_url_unique_idx`;
+  await sql`CREATE UNIQUE INDEX IF NOT EXISTS mentions_brand_url_unique_idx ON sentiment_mentions(brand_id, url)`;
   await sql`CREATE INDEX IF NOT EXISTS brands_created_at_idx ON sentiment_brands(created_at)`;
   await sql`CREATE INDEX IF NOT EXISTS mentions_detected_at_idx ON sentiment_mentions(detected_at)`;
   await sql`CREATE INDEX IF NOT EXISTS scan_runs_brand_id_idx ON sentiment_scan_runs(brand_id)`;

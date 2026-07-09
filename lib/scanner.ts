@@ -8,6 +8,36 @@ const MAX_RESULTS_PER_QUERY = 5;
 const MAX_NEW_MENTIONS_PER_BRAND = 30;
 const MAX_APIFY_ENRICHMENTS_PER_BRAND = 12;
 
+function aliasVariants(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) return [];
+
+  const variants = new Set([trimmed]);
+
+  try {
+    const parsed = new URL(trimmed.startsWith("http") ? trimmed : `https://${trimmed}`);
+    const host = parsed.hostname.replace(/^www\./, "");
+    variants.add(host);
+    variants.add(host.replace(/\.(com|in|co|net|org|io|ai|app)$/i, ""));
+
+    const redditUser = parsed.pathname.match(/\/user\/([^/]+)/i)?.[1];
+    if (redditUser) {
+      variants.add(redditUser);
+      variants.add(`u/${redditUser}`);
+    }
+  } catch {
+    variants.add(trimmed.replace(/^www\./i, "").replace(/\.(com|in|co|net|org|io|ai|app)$/i, ""));
+  }
+
+  return Array.from(variants).filter((item) => item.length >= 3);
+}
+
+function brandAliasesForScan(brand: BrandRecord) {
+  return Array.from(
+    new Set([brand.name, brand.website, ...brand.brandAccounts].flatMap(aliasVariants).filter(Boolean)),
+  );
+}
+
 export type ScanSummary = {
   brandsScanned: number;
   queriesRun: number;
@@ -127,7 +157,7 @@ export async function scanBrands(brandId?: string): Promise<ScanSummary> {
       ...brand.services,
       ...brand.competitors,
     ];
-    const brandAliases = [brand.name, brand.website, ...brand.brandAccounts].filter(Boolean);
+    const brandAliases = brandAliasesForScan(brand);
     const queries = buildBrandQueries(brand.name, searchTerms).slice(0, MAX_QUERIES_PER_BRAND);
     const seenUrls = new Set<string>();
     const scanMentions: MentionRecord[] = [];
@@ -160,7 +190,7 @@ export async function scanBrands(brandId?: string): Promise<ScanSummary> {
             continue;
           }
 
-          const existing = await findMentionByUrl(result.url);
+          const existing = await findMentionByUrl(result.url, brand.id);
           const shouldEnrich = apifyEnrichments < MAX_APIFY_ENRICHMENTS_PER_BRAND;
           if (shouldEnrich && process.env.APIFY_API_TOKEN) {
             apifyEnrichments += 1;

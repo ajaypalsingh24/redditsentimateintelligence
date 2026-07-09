@@ -444,14 +444,16 @@ export async function deleteBrand(id: string) {
   await writeJsonStore(store);
 }
 
-export async function findMentionByUrl(url: string) {
+export async function findMentionByUrl(url: string, brandId?: string) {
   if (await useDatabase()) {
-    const rows = (await sql!`SELECT * FROM sentiment_mentions WHERE url = ${url} LIMIT 1`) as MentionRow[];
+    const rows = brandId
+      ? ((await sql!`SELECT * FROM sentiment_mentions WHERE url = ${url} AND brand_id = ${brandId} LIMIT 1`) as MentionRow[])
+      : ((await sql!`SELECT * FROM sentiment_mentions WHERE url = ${url} LIMIT 1`) as MentionRow[]);
     return rows[0] ? mapMention(rows[0]) : null;
   }
 
   const store = await readJsonStore();
-  return store.mentions.find((mention) => mention.url === url) || null;
+  return store.mentions.find((mention) => mention.url === url && (!brandId || mention.brandId === brandId)) || null;
 }
 
 export async function updateMention(data: MentionRecord) {
@@ -602,7 +604,7 @@ async function insertMention(mention: MentionRecord) {
       ${mention.opportunityType}, ${mention.recommendedAction}, ${mention.isBrandMentioned}, ${mention.isUrgent},
       ${mention.detectedAt.toISOString()}, ${mention.createdAt.toISOString()}, ${mention.updatedAt.toISOString()}
     )
-    ON CONFLICT (url) DO NOTHING
+    ON CONFLICT (brand_id, url) DO NOTHING
   `;
 }
 
