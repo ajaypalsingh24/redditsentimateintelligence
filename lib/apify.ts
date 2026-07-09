@@ -59,9 +59,18 @@ export async function scrapeRedditUrlWithApify(redditUrl: string): Promise<Reddi
 
   const actorInput = {
     startUrls: [{ url: redditUrl }],
-    skipComments: false,
-    skipUserPosts: true,
-    skipCommunity: true,
+    sort: "new",
+    maxItems: 10,
+    maxPostCount: 10,
+    maxComments: 10,
+    maxCommunitiesCount: 2,
+    maxUserCount: 2,
+    scrollTimeout: 40,
+    maxRequestRetries: 6,
+    proxy: {
+      useApifyProxy: true,
+      apifyProxyGroups: ["RESIDENTIAL"],
+    },
   };
 
   let response: Response;

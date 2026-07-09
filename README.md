@@ -24,6 +24,7 @@ No Reddit API is required. The app finds public Reddit URLs from Google, stores 
 - Exports client-ready PDFs and can email generated PDF reports
 - Scrapes Reddit URLs through a backend-only Apify route when deeper post/comment data is needed
 - Enriches SerpApi-discovered Reddit URLs with Apify thread data before OpenAI sentiment classification when `APIFY_API_TOKEN` is configured
+- Uses the `trudax/reddit-scraper` actor with post/comment limits and Apify residential proxy settings from the backend
 
 ## Required Environment Variables
 
