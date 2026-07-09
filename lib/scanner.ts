@@ -1,3 +1,4 @@
+import { buildScrapedContext, scrapeRedditUrlWithApify } from "@/lib/apify";
 import { classifyMention } from "@/lib/sentiment";
 import { buildBrandQueries, isBrandMentioned, isRelevantOpportunity, searchRedditWithSerpApi } from "@/lib/serpapi";
 import { createMention, createScanRun, findMentionByUrl, getActiveBrands, MentionRecord } from "@/lib/store";
@@ -5,6 +6,7 @@ import { createMention, createScanRun, findMentionByUrl, getActiveBrands, Mentio
 const MAX_QUERIES_PER_BRAND = 8;
 const MAX_RESULTS_PER_QUERY = 5;
 const MAX_NEW_MENTIONS_PER_BRAND = 30;
+const MAX_APIFY_ENRICHMENTS_PER_BRAND = 12;
 
 export type ScanSummary = {
   brandsScanned: number;
@@ -52,6 +54,7 @@ export async function scanBrands(brandId?: string): Promise<ScanSummary> {
     const scanErrors: string[] = [];
     let brandQueriesRun = 0;
     let brandNewMentions = 0;
+    let apifyEnrichments = 0;
 
     for (const query of queries) {
       summary.queriesRun += 1;
@@ -87,8 +90,45 @@ export async function scanBrands(brandId?: string): Promise<ScanSummary> {
             continue;
           }
 
-          const classification = brandMentioned
-            ? await classifyMention(result.title, result.snippet, brand.name)
+          let enrichedTitle = result.title;
+          let enrichedSnippet = result.snippet;
+          let enrichedSubreddit = result.subreddit;
+          let enrichedAuthor = "";
+          let enrichedUpvotes: number | null = null;
+          let enrichedCommentCount: number | null = null;
+          let enrichedPostDateLabel = "";
+
+          if (apifyEnrichments < MAX_APIFY_ENRICHMENTS_PER_BRAND && process.env.APIFY_API_TOKEN) {
+            try {
+              apifyEnrichments += 1;
+              const scraped = await scrapeRedditUrlWithApify(result.url);
+              const context = buildScrapedContext(scraped.items);
+              enrichedTitle = context.title || enrichedTitle;
+              enrichedSnippet = context.text || enrichedSnippet;
+              enrichedSubreddit = context.subreddit || enrichedSubreddit;
+              enrichedAuthor = context.author;
+              enrichedUpvotes = context.score;
+              enrichedCommentCount = context.commentsCount;
+              enrichedPostDateLabel = context.createdAt;
+            } catch (error) {
+              const message = `${brand.name}: Apify enrich failed for ${result.url}: ${error instanceof Error ? error.message : "Unknown error"}`;
+              summary.errors.push(message);
+              scanErrors.push(message);
+            }
+          }
+
+          const enrichedResult = {
+            ...result,
+            title: enrichedTitle,
+            snippet: enrichedSnippet,
+            subreddit: enrichedSubreddit,
+          };
+
+          const enrichedBrandMentioned = isBrandMentioned(enrichedResult, brand.name, brandAliases);
+          const finalBrandMentioned = brandMentioned || enrichedBrandMentioned;
+
+          const classification = finalBrandMentioned
+            ? await classifyMention(enrichedTitle, enrichedSnippet, brand.name)
             : {
                 sentiment: "not-applicable" as const,
                 confidence: 0,
@@ -100,15 +140,15 @@ export async function scanBrands(brandId?: string): Promise<ScanSummary> {
               };
           const mention = await createMention({
             brandId: brand.id,
-            title: result.title.slice(0, 500),
+            title: enrichedTitle.slice(0, 500),
             url: result.url,
             displayLink: result.displayLink,
-            subreddit: result.subreddit,
-            author: "",
-            upvotes: null,
-            commentCount: null,
-            postDateLabel: "",
-            snippet: result.snippet,
+            subreddit: enrichedSubreddit,
+            author: enrichedAuthor,
+            upvotes: enrichedUpvotes,
+            commentCount: enrichedCommentCount,
+            postDateLabel: enrichedPostDateLabel,
+            snippet: enrichedSnippet,
             sourceQuery: result.sourceQuery,
             sentiment: classification.sentiment,
             confidence: classification.confidence,
@@ -117,7 +157,7 @@ export async function scanBrands(brandId?: string): Promise<ScanSummary> {
             themes: classification.themes,
             opportunityType: classification.opportunity_type,
             recommendedAction: classification.recommended_action,
-            isBrandMentioned: brandMentioned,
+            isBrandMentioned: finalBrandMentioned,
             isUrgent: classification.sentiment === "negative" && classification.risk_score >= 8,
           });
 

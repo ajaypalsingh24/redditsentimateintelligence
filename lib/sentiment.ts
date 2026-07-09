@@ -172,11 +172,11 @@ export async function classifyMention(title: string, snippet: string, brandName 
           {
             role: "system",
             content:
-              "You classify Reddit sentiment for a brand reputation dashboard. Use only the Reddit title and snippet provided. Classify sentiment toward the brand, not general mood. If the snippet is a question or has no clear opinion about the brand, choose neutral. Keep reason and themes short.",
+              "You classify Reddit sentiment for a brand reputation dashboard. Use only the Reddit title, body, comments, and context provided. Classify sentiment toward the brand, not general mood. If the context is a question or has no clear opinion about the brand, choose neutral. Keep reason and themes short.",
           },
           {
             role: "user",
-            content: `Brand: ${brandName}\nReddit title: ${title}\nReddit snippet: ${snippet}`,
+            content: `Brand: ${brandName}\nReddit title: ${title}\nReddit context: ${snippet}`,
           },
         ],
         text: {

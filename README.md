@@ -22,7 +22,8 @@ No Reddit API is required. The app finds public Reddit URLs from Google, stores 
 - Keeps Reddit account URLs as manual references only
 - Shows opportunity-only threads separately when the brand is not mentioned
 - Exports client-ready PDFs and can email generated PDF reports
-- Scrapes a specific Reddit URL through a backend-only Apify route when deeper post/comment data is needed
+- Scrapes Reddit URLs through a backend-only Apify route when deeper post/comment data is needed
+- Enriches SerpApi-discovered Reddit URLs with Apify thread data before OpenAI sentiment classification when `APIFY_API_TOKEN` is configured
 
 ## Required Environment Variables
 
@@ -63,10 +64,11 @@ EMAIL_FROM="Reddify Reports <reports@yourdomain.com>"
 1. Add a brand name, website, aliases, known Reddit URLs, and target subreddits.
 2. Click `Scan Reddit`.
 3. SerpApi searches Google for Reddit URLs.
-4. If the brand is mentioned, OpenAI classifies sentiment and the URL counts in the sentiment score.
-5. If the brand is not mentioned but the topic/competitor context is relevant, the URL is stored only as an opportunity.
-6. The dashboard reports sentiment, opportunity gaps, scan snapshots, and actions.
-7. Use the `Apify Scraper` tab to scrape one Reddit URL through `/api/reddit-scrape`; the Apify token stays on the backend.
+4. Apify enriches discovered Reddit URLs with available post/comment data.
+5. If the brand is mentioned, OpenAI classifies sentiment and the URL counts in the sentiment score.
+6. If the brand is not mentioned but the topic/competitor context is relevant, the URL is stored only as an opportunity.
+7. The dashboard reports sentiment, opportunity gaps, scan snapshots, and actions.
+8. Use the `Apify Scraper` tab to scrape one Reddit URL through `/api/reddit-scrape`; the Apify token stays on the backend.
 
 ## What This Version Does Not Do
 
