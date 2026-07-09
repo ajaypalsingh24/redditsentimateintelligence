@@ -16,8 +16,6 @@ services:
         sync: false
       - key: OPENAI_MODEL
         value: gpt-4.1-mini
-      - key: APIFY_API_TOKEN
-        sync: false
       - key: DASHBOARD_PASSWORD
         sync: false
       - key: CRON_SECRET
