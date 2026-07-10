@@ -358,31 +358,42 @@ export default async function DashboardPage({ searchParams }: { searchParams?: P
 
           <div className="print-report mt-5">
             <section className="print-cover hidden rounded-xl bg-white p-6">
-              <div className="flex items-start justify-between gap-6">
-                <div>
-                  <div className="print-logo" aria-label="reddify.me">
-                    <span>reddify</span>
-                    <span className="logo-dot">.</span>
-                    <span className="logo-me">me</span>
+              <div className="print-cover-top flex items-start justify-between gap-6">
+                <div className="print-brand-lockup">
+                  <div className="print-mark" aria-hidden="true">r</div>
+                  <div>
+                    <div className="print-logo" aria-label="reddify.me">
+                      <span>reddify</span>
+                      <span className="logo-dot">.</span>
+                      <span className="logo-me">me</span>
+                    </div>
+                    <p className="mt-2 text-xs font-bold uppercase tracking-[0.2em] text-slate-500">sentiment intelligence</p>
                   </div>
-                  <p className="mt-2 text-xs font-bold uppercase tracking-[0.2em] text-slate-500">sentiment intelligence</p>
                 </div>
-                <div className="text-right">
-                  <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Client Report</p>
-                  <h1 className="mt-2 text-2xl font-bold text-slate-950">{brand?.name || "Reddit Sentiment Report"}</h1>
+                <div className="print-report-title text-right">
+                  <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Client Reddit Report</p>
+                  <h1 className="mt-2 text-3xl font-bold text-slate-950">{brand?.name || "Reddit Sentiment Report"}</h1>
                   <p className="mt-1 text-sm text-slate-500">{brand?.website || "Reddit visibility and sentiment analysis"}</p>
                 </div>
               </div>
-              <div className="mt-6 grid gap-3 sm:grid-cols-3">
-                <div className="rounded-lg bg-slate-50 p-3">
+              <div className="print-summary-panel mt-6 rounded-lg p-4">
+                <p className="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">Executive Snapshot</p>
+                <p className="mt-2 text-sm leading-6 text-slate-700">{brand ? overallInsight(brand, sentimentMentions) : "Create a project to generate Reddit sentiment insight."}</p>
+              </div>
+              <div className="print-kpi-grid mt-5 grid gap-3 sm:grid-cols-4">
+                <div className="print-kpi rounded-lg bg-slate-50 p-3">
                   <p className="text-xs font-bold uppercase text-slate-500">Report snapshot</p>
                   <p className="mt-1 text-sm font-semibold text-slate-900">{scanLabel(selectedScanRun)}</p>
                 </div>
-                <div className="rounded-lg bg-slate-50 p-3">
+                <div className="print-kpi rounded-lg bg-slate-50 p-3">
                   <p className="text-xs font-bold uppercase text-slate-500">Sentiment score</p>
                   <p className="mt-1 text-sm font-semibold text-slate-900">{stats.total ? stats.sentimentScore : "NA"}</p>
                 </div>
-                <div className="rounded-lg bg-slate-50 p-3">
+                <div className="print-kpi rounded-lg bg-slate-50 p-3">
+                  <p className="text-xs font-bold uppercase text-slate-500">Thread mix</p>
+                  <p className="mt-1 text-sm font-semibold text-slate-900">{stats.positivePct}% positive · {stats.negativePct}% negative</p>
+                </div>
+                <div className="print-kpi rounded-lg bg-slate-50 p-3">
                   <p className="text-xs font-bold uppercase text-slate-500">Generated</p>
                   <p className="mt-1 text-sm font-semibold text-slate-900">{dateLabel(new Date())}</p>
                 </div>

@@ -370,7 +370,7 @@ button {
 
 @media print {
   @page {
-    margin: 14mm;
+    margin: 12mm;
     size: A4;
   }
 
@@ -385,9 +385,34 @@ button {
 
   .print-cover {
     border: 1px solid #dbe3ef !important;
+    border-top: 6px solid #c91f25 !important;
     display: block !important;
-    margin-bottom: 16px !important;
+    margin-bottom: 18px !important;
     page-break-after: avoid;
+  }
+
+  .print-cover-top {
+    align-items: flex-start !important;
+  }
+
+  .print-brand-lockup {
+    align-items: center;
+    display: flex;
+    gap: 14px;
+  }
+
+  .print-mark {
+    align-items: center;
+    background: #c91f25;
+    border-radius: 8px;
+    color: #ffffff;
+    display: flex;
+    font-size: 28px;
+    font-weight: 900;
+    height: 52px;
+    justify-content: center;
+    line-height: 1;
+    width: 52px;
   }
 
   .print-logo {
@@ -405,6 +430,19 @@ button {
   .print-logo .logo-dot,
   .print-logo .logo-me {
     color: #dc2626 !important;
+  }
+
+  .print-report-title h1 {
+    letter-spacing: 0 !important;
+  }
+
+  .print-summary-panel {
+    background: #f8fafc !important;
+    border: 1px solid #e2e8f0 !important;
+  }
+
+  .print-kpi {
+    border: 1px solid #e2e8f0 !important;
   }
 
   .complete-report {
@@ -438,7 +476,7 @@ button {
   .print-report {
     display: block !important;
     max-width: none !important;
-    padding: 18px 0 0 !important;
+    padding: 8px 0 0 !important;
   }
 
   .print-report > div:not(.complete-report),
@@ -448,8 +486,40 @@ button {
   }
 
   .print-report section {
-    margin-bottom: 14px;
+    margin-bottom: 12px;
     border-color: #cbd5e1 !important;
+  }
+
+  .print-report h2 {
+    font-size: 18px !important;
+  }
+
+  .print-report article {
+    border-color: #e2e8f0 !important;
+  }
+
+  .print-report .metric-card {
+    border-color: #dbe3ef !important;
+    min-height: 104px !important;
+    padding: 14px !important;
+  }
+
+  .print-report .metric-card strong {
+    color: #0f172a !important;
+    font-size: 24px !important;
+  }
+
+  .print-report .rounded-xl {
+    border-radius: 10px !important;
+  }
+
+  .print-report .rounded-lg,
+  .print-report .rounded-md {
+    border-radius: 7px !important;
+  }
+
+  .print-report .divide-y > article {
+    padding: 14px !important;
   }
 
   a {
