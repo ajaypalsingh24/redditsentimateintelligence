@@ -404,7 +404,7 @@ export default async function DashboardPage({ searchParams }: { searchParams?: P
 
             {activeTab === "sentiment" ? <SentimentTab mentions={sentimentMentions} stats={stats} themes={themes} brand={brand} /> : null}
             {activeTab === "opportunities" ? <OpportunitiesTab brand={brand} mentions={opportunityThreads} targetMentions={initialTargetThreads} subreddits={subreddits} /> : null}
-            {activeTab === "threads" ? <ThreadsTab sentimentMentions={sentimentMentions} opportunityMentions={opportunityThreads} brand={brand} /> : null}
+            {activeTab === "threads" ? <ThreadsTab sentimentMentions={sentimentMentions} opportunityMentions={opportunityThreads} targetMentions={initialTargetThreads} brand={brand} /> : null}
             {activeTab === "account" ? <AccountTab accounts={accounts} /> : null}
             {activeTab === "settings" ? <SettingsTab brands={brands} brand={brand} /> : null}
 
@@ -421,7 +421,7 @@ export default async function DashboardPage({ searchParams }: { searchParams?: P
               />
               <SentimentTab mentions={sentimentMentions} stats={stats} themes={themes} brand={brand} />
               <OpportunitiesTab brand={brand} mentions={opportunityThreads} targetMentions={initialTargetThreads} subreddits={subreddits} />
-              <ThreadsTab sentimentMentions={sentimentMentions} opportunityMentions={opportunityThreads} brand={brand} />
+              <ThreadsTab sentimentMentions={sentimentMentions} opportunityMentions={opportunityThreads} targetMentions={initialTargetThreads} brand={brand} />
               <AccountTab accounts={accounts} />
             </div>
           </div>
@@ -634,7 +634,17 @@ function TargetThreadList({ mentions, brand }: { mentions: MentionRecord[]; bran
   );
 }
 
-function ThreadsTab({ sentimentMentions, opportunityMentions, brand }: { sentimentMentions: MentionRecord[]; opportunityMentions: MentionRecord[]; brand?: BrandRecord }) {
+function ThreadsTab({
+  sentimentMentions,
+  opportunityMentions,
+  targetMentions,
+  brand,
+}: {
+  sentimentMentions: MentionRecord[];
+  opportunityMentions: MentionRecord[];
+  targetMentions: MentionRecord[];
+  brand?: BrandRecord;
+}) {
   return (
     <section className="grid gap-5 lg:grid-cols-2">
       <div className="rounded-xl border border-slate-200 bg-white">
@@ -646,8 +656,9 @@ function ThreadsTab({ sentimentMentions, opportunityMentions, brand }: { sentime
       <div className="rounded-xl border border-slate-200 bg-white">
         <div className="border-b border-slate-200 p-5">
           <h2 className="text-lg font-bold">Opportunity Threads</h2>
+          <p className="mt-1 text-sm text-slate-500">Includes visibility gaps first, then neutral/manual target threads when no gaps exist.</p>
         </div>
-        <ThreadList mentions={opportunityMentions} brand={brand} mode="opportunity" />
+        {opportunityMentions.length ? <ThreadList mentions={opportunityMentions} brand={brand} mode="opportunity" /> : <TargetThreadList mentions={targetMentions} brand={brand} />}
       </div>
     </section>
   );
