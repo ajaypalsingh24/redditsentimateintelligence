@@ -134,6 +134,7 @@ export default async function DashboardPage({ searchParams }: { searchParams?: P
   const plan = brand ? actionPlan(brand, selectedMentions).slice(0, 5) : [];
   const accounts = brand ? (brand.brandAccounts || []).map((account) => getRedditAccountReference(account)) : [];
   const opportunityThreads = opportunityOnlyMentions.slice(0, 20);
+  const initialTargetThreads = (opportunityOnlyMentions.length ? opportunityOnlyMentions : sentimentMentions.filter((mention) => mention.sentiment === "neutral")).slice(0, 20);
   const themeQuery = `theme=${theme}`;
   const scanQuery = selectedScanRun ? `&scan=${selectedScanRun.id}` : "";
   const queryBase = `project=${brand?.id || ""}${scanQuery}&${themeQuery}`;
@@ -402,7 +403,7 @@ export default async function DashboardPage({ searchParams }: { searchParams?: P
             ) : null}
 
             {activeTab === "sentiment" ? <SentimentTab mentions={sentimentMentions} stats={stats} themes={themes} brand={brand} /> : null}
-            {activeTab === "opportunities" ? <OpportunitiesTab brand={brand} mentions={opportunityThreads} subreddits={subreddits} /> : null}
+            {activeTab === "opportunities" ? <OpportunitiesTab brand={brand} mentions={opportunityThreads} targetMentions={initialTargetThreads} subreddits={subreddits} /> : null}
             {activeTab === "threads" ? <ThreadsTab sentimentMentions={sentimentMentions} opportunityMentions={opportunityThreads} brand={brand} /> : null}
             {activeTab === "account" ? <AccountTab accounts={accounts} /> : null}
             {activeTab === "settings" ? <SettingsTab brands={brands} brand={brand} /> : null}
@@ -419,7 +420,7 @@ export default async function DashboardPage({ searchParams }: { searchParams?: P
                 strategy={strategy}
               />
               <SentimentTab mentions={sentimentMentions} stats={stats} themes={themes} brand={brand} />
-              <OpportunitiesTab brand={brand} mentions={opportunityThreads} subreddits={subreddits} />
+              <OpportunitiesTab brand={brand} mentions={opportunityThreads} targetMentions={initialTargetThreads} subreddits={subreddits} />
               <ThreadsTab sentimentMentions={sentimentMentions} opportunityMentions={opportunityThreads} brand={brand} />
               <AccountTab accounts={accounts} />
             </div>
@@ -545,7 +546,17 @@ function SentimentTab({ mentions, stats, themes, brand }: { mentions: MentionRec
   );
 }
 
-function OpportunitiesTab({ brand, mentions, subreddits }: { brand?: BrandRecord; mentions: MentionRecord[]; subreddits: ReturnType<typeof subredditTargets> }) {
+function OpportunitiesTab({
+  brand,
+  mentions,
+  targetMentions,
+  subreddits,
+}: {
+  brand?: BrandRecord;
+  mentions: MentionRecord[];
+  targetMentions: MentionRecord[];
+  subreddits: ReturnType<typeof subredditTargets>;
+}) {
   return (
     <div className="grid gap-5">
       <section className="rounded-xl border border-slate-200 bg-white p-5">
@@ -557,9 +568,9 @@ function OpportunitiesTab({ brand, mentions, subreddits }: { brand?: BrandRecord
         <div className="rounded-xl border border-slate-200 bg-white">
           <div className="border-b border-slate-200 p-5">
             <h2 className="text-lg font-bold">Initial Reddit Threads to Target</h2>
-            <p className="mt-1 text-sm text-slate-500">Brand-absent and recommendation-led threads belong here, not in sentiment.</p>
+            <p className="mt-1 text-sm text-slate-500">Use this for manual review, outreach planning, and content opportunities. Sentiment scoring remains separate.</p>
           </div>
-          <ThreadList mentions={mentions} brand={brand} mode="opportunity" />
+          <TargetThreadList mentions={targetMentions} brand={brand} />
         </div>
         <div className="rounded-xl border border-slate-200 bg-white p-5">
           <h2 className="text-lg font-bold">Best Subreddits</h2>
@@ -573,6 +584,52 @@ function OpportunitiesTab({ brand, mentions, subreddits }: { brand?: BrandRecord
           </div>
         </div>
       </section>
+    </div>
+  );
+}
+
+function TargetThreadList({ mentions, brand }: { mentions: MentionRecord[]; brand?: BrandRecord }) {
+  const seen = new Set(mentions.map((mention) => mention.url.replace(/\/$/, "")));
+  const knownThreads = (brand?.knownThreads || [])
+    .map((url) => url.trim())
+    .filter(Boolean)
+    .filter((url) => !seen.has(url.replace(/\/$/, "")));
+
+  if (!mentions.length && !knownThreads.length) {
+    return <p className="p-8 text-center text-sm leading-6 text-slate-500">No target threads yet. Add known Reddit URLs in project settings or run a scan with category keywords.</p>;
+  }
+
+  return (
+    <div className="divide-y divide-slate-100">
+      {mentions.map((mention) => (
+        <article key={mention.id} className="grid gap-3 p-5">
+          <div className="flex flex-wrap gap-2 text-xs font-bold">
+            <span className="rounded-full bg-teal-50 px-3 py-1 text-teal-700 ring-1 ring-teal-200">
+              {mention.isBrandMentioned === false ? "Visibility gap" : "Review target"}
+            </span>
+            <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-700 ring-1 ring-slate-200">{mention.subreddit || "Reddit"}</span>
+            <span className="rounded-full bg-slate-50 px-3 py-1 text-slate-600 ring-1 ring-slate-200">Keyword: {sourceKeyword(mention)}</span>
+          </div>
+          <a href={mention.url} target="_blank" rel="noreferrer" className="font-bold text-slate-950 hover:text-teal-700">{mention.title}</a>
+          <p className="text-sm leading-6 text-slate-600">
+            {mention.isBrandMentioned === false
+              ? "Brand is absent from this relevant discussion. Review for organic participation or content planning."
+              : "Brand/product is mentioned but sentiment is not decisive. Review manually before deciding whether to respond or monitor."}
+          </p>
+          <p className="break-all text-xs text-slate-500">{mention.url}</p>
+        </article>
+      ))}
+
+      {knownThreads.map((url) => (
+        <article key={url} className="grid gap-3 p-5">
+          <div className="flex flex-wrap gap-2 text-xs font-bold">
+            <span className="rounded-full bg-amber-50 px-3 py-1 text-amber-700 ring-1 ring-amber-200">Manual target</span>
+            <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-700 ring-1 ring-slate-200">Known Reddit URL</span>
+          </div>
+          <a href={url} target="_blank" rel="noreferrer" className="break-all font-bold text-slate-950 hover:text-teal-700">{url}</a>
+          <p className="text-sm leading-6 text-slate-600">Added in project settings. Review manually and keep it as a target thread for monitoring, response planning, or future content ideas.</p>
+        </article>
+      ))}
     </div>
   );
 }
