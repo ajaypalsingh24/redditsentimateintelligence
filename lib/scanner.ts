@@ -1,4 +1,3 @@
-import { buildScrapedContext, scrapeRedditUrlWithApify } from "@/lib/apify";
 import { classifyMention } from "@/lib/sentiment";
 import { buildBrandQueries, isBrandMentioned, isRelevantOpportunity, searchRedditWithSerpApi, SerpMentionResult } from "@/lib/serpapi";
 import { BrandRecord, createMention, createScanRun, findMentionByUrl, getActiveBrands, MentionRecord, updateMention } from "@/lib/store";
@@ -6,7 +5,6 @@ import { BrandRecord, createMention, createScanRun, findMentionByUrl, getActiveB
 const MAX_QUERIES_PER_BRAND = 8;
 const MAX_RESULTS_PER_QUERY = 5;
 const MAX_NEW_MENTIONS_PER_BRAND = 30;
-const MAX_APIFY_ENRICHMENTS_PER_BRAND = 12;
 
 function aliasVariants(value: string) {
   const trimmed = value.trim();
@@ -32,6 +30,118 @@ function aliasVariants(value: string) {
   return Array.from(variants).filter((item) => item.length >= 3);
 }
 
+function normalizedWords(value: string) {
+  return value
+    .toLowerCase()
+    .replace(/https?:\/\//g, " ")
+    .replace(/www\./g, " ")
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function compactWords(value: string) {
+  return normalizedWords(value).replace(/\s+/g, "");
+}
+
+function compactUrl(value: string) {
+  try {
+    const parsed = new URL(value);
+    return compactWords(`${parsed.hostname} ${parsed.pathname}`);
+  } catch {
+    return "";
+  }
+}
+
+function contextualProductTerms(brand: BrandRecord) {
+  const configuredTerms = brand.services
+    .join(" ")
+    .split(/[\s,./&-]+/)
+    .map((term) => term.trim().toLowerCase())
+    .filter((term) => term.length >= 5);
+
+  return Array.from(
+    new Set([
+      ...configuredTerms,
+      "airfryer",
+      "fryer",
+      "appliance",
+      "appliances",
+      "blender",
+      "kitchen",
+      "maker",
+      "ice",
+      "cream",
+    ]),
+  );
+}
+
+function hasContextualProductBrandMention(brand: BrandRecord, result: SerpMentionResult) {
+  const brandTokens = normalizedWords(brand.name)
+    .split(" ")
+    .filter((token) => token.length >= 5);
+
+  if (!brandTokens.length) return false;
+
+  const text = normalizedWords(`${result.title} ${result.snippet}`);
+  const words = new Set(text.split(" ").filter(Boolean));
+  const hasBrandToken = brandTokens.some((token) => words.has(token));
+  const hasProductContext = contextualProductTerms(brand).some((term) => words.has(term));
+
+  return hasBrandToken && hasProductContext;
+}
+
+function hasCategoryOpportunityContext(brand: BrandRecord, result: SerpMentionResult) {
+  const text = normalizedWords(`${result.title} ${result.snippet} ${result.url}`);
+  const words = new Set(text.split(" ").filter(Boolean));
+  const hasProductContext = contextualProductTerms(brand).some((term) => words.has(term));
+  const hasCompetitorContext = brand.competitors.some((competitor) => {
+    const normalizedCompetitor = normalizedWords(competitor);
+    return normalizedCompetitor && ` ${text} `.includes(` ${normalizedCompetitor} `);
+  });
+  const isKnownThread = brand.knownThreads.some((url) => url && result.url.startsWith(url.replace(/\/$/, "")));
+
+  return hasProductContext || hasCompetitorContext || isKnownThread;
+}
+
+function requiresProductContext(brand: BrandRecord) {
+  const tokens = normalizedWords(brand.name)
+    .split(" ")
+    .filter(Boolean);
+
+  return tokens.length === 2 && tokens[0] === "my" && tokens[1].length <= 6;
+}
+
+function hasWebsiteOrAccountMention(brand: BrandRecord, result: SerpMentionResult) {
+  const words = new Set(normalizedWords(`${result.title} ${result.snippet}`).split(" ").filter(Boolean));
+  const url = compactUrl(result.url);
+  const aliases = [brand.website, ...brand.brandAccounts].flatMap(aliasVariants);
+
+  return aliases.some((alias) => {
+    const normalized = normalizedWords(alias);
+    const aliasCompact = compactWords(alias);
+    return (
+      (normalized.length >= 6 && words.has(normalized)) ||
+      (aliasCompact.length >= 6 && url.includes(aliasCompact))
+    );
+  });
+}
+
+function isReliableBrandMention(brand: BrandRecord, result: SerpMentionResult, aliases: string[]) {
+  const directMention = isBrandMentioned(result, brand.name, aliases);
+  const contextualMention = hasContextualProductBrandMention(brand, result);
+
+  if (!directMention && !contextualMention) {
+    return false;
+  }
+
+  if (requiresProductContext(brand) && !contextualMention && !hasWebsiteOrAccountMention(brand, result)) {
+    return false;
+  }
+
+  return true;
+}
+
 function brandAliasesForScan(brand: BrandRecord) {
   return Array.from(
     new Set([brand.name, brand.website, ...brand.brandAccounts].flatMap(aliasVariants).filter(Boolean)),
@@ -53,9 +163,6 @@ async function buildMentionData(
   result: SerpMentionResult,
   brandMentioned: boolean,
   brandAliases: string[],
-  summary: ScanSummary,
-  scanErrors: string[],
-  shouldEnrich: boolean,
 ) {
   let enrichedTitle = result.title;
   let enrichedSnippet = result.snippet;
@@ -65,24 +172,6 @@ async function buildMentionData(
   let enrichedCommentCount: number | null = null;
   let enrichedPostDateLabel = "";
 
-  if (shouldEnrich && process.env.APIFY_API_TOKEN) {
-    try {
-      const scraped = await scrapeRedditUrlWithApify(result.url);
-      const context = buildScrapedContext(scraped.items);
-      enrichedTitle = context.title || enrichedTitle;
-      enrichedSnippet = context.text || enrichedSnippet;
-      enrichedSubreddit = context.subreddit || enrichedSubreddit;
-      enrichedAuthor = context.author;
-      enrichedUpvotes = context.score;
-      enrichedCommentCount = context.commentsCount;
-      enrichedPostDateLabel = context.createdAt;
-    } catch (error) {
-      const message = `${brand.name}: Apify enrich failed for ${result.url}: ${error instanceof Error ? error.message : "Unknown error"}`;
-      summary.errors.push(message);
-      scanErrors.push(message);
-    }
-  }
-
   const enrichedResult = {
     ...result,
     title: enrichedTitle,
@@ -90,7 +179,7 @@ async function buildMentionData(
     subreddit: enrichedSubreddit,
   };
 
-  const enrichedBrandMentioned = isBrandMentioned(enrichedResult, brand.name, brandAliases);
+  const enrichedBrandMentioned = isReliableBrandMention(brand, enrichedResult, brandAliases);
   const finalBrandMentioned = brandMentioned || enrichedBrandMentioned;
 
   const classification = finalBrandMentioned
@@ -164,7 +253,6 @@ export async function scanBrands(brandId?: string): Promise<ScanSummary> {
     const scanErrors: string[] = [];
     let brandQueriesRun = 0;
     let brandNewMentions = 0;
-    let apifyEnrichments = 0;
 
     for (const query of queries) {
       summary.queriesRun += 1;
@@ -183,20 +271,15 @@ export async function scanBrands(brandId?: string): Promise<ScanSummary> {
           }
           seenUrls.add(result.url);
 
-          const brandMentioned = isBrandMentioned(result, brand.name, brandAliases);
-          const relevantOpportunity = isRelevantOpportunity(result, relevanceTerms);
+          const brandMentioned = isReliableBrandMention(brand, result, brandAliases);
+          const relevantOpportunity = isRelevantOpportunity(result, relevanceTerms) && hasCategoryOpportunityContext(brand, result);
 
           if (!brandMentioned && !relevantOpportunity) {
             continue;
           }
 
           const existing = await findMentionByUrl(result.url, brand.id);
-          const shouldEnrich = apifyEnrichments < MAX_APIFY_ENRICHMENTS_PER_BRAND;
-          if (shouldEnrich && process.env.APIFY_API_TOKEN) {
-            apifyEnrichments += 1;
-          }
-
-          const mentionData = await buildMentionData(brand, result, brandMentioned, brandAliases, summary, scanErrors, shouldEnrich);
+          const mentionData = await buildMentionData(brand, result, brandMentioned, brandAliases);
           const mention = existing
             ? await updateMention({
                 ...existing,

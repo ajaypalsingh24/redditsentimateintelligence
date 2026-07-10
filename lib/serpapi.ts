@@ -62,6 +62,15 @@ function compactText(value: string) {
   return normalizeText(value).replace(/\s+/g, "");
 }
 
+function compactUrl(value: string) {
+  try {
+    const parsed = new URL(value);
+    return compactText(`${parsed.hostname} ${parsed.pathname}`);
+  } catch {
+    return compactText(value);
+  }
+}
+
 function wordSet(value: string) {
   return new Set(normalizeText(value).split(" ").filter(Boolean));
 }
@@ -114,12 +123,11 @@ export function extractSubreddit(url: string) {
 export function isBrandMentioned(result: SerpMentionResult, brandName: string, aliases: string[]) {
   const rawHaystack = `${result.title} ${result.snippet} ${result.url}`;
   const haystack = normalizeText(rawHaystack);
-  const compactHaystack = compactText(`${result.title} ${result.snippet} ${result.url}`);
+  const urlCompact = compactUrl(result.url);
   const words = wordSet(rawHaystack);
   const normalizedBrand = normalizeText(brandName);
   const compactBrand = compactText(brandName);
   const reversedBrand = normalizeText(brandName).split(" ").reverse().join(" ");
-  const compactReversedBrand = compactText(reversedBrand);
 
   if (!normalizedBrand) {
     return false;
@@ -127,8 +135,8 @@ export function isBrandMentioned(result: SerpMentionResult, brandName: string, a
 
   if (
     containsPhrase(haystack, normalizedBrand) ||
-    (compactBrand.length >= 8 && compactHaystack.includes(compactBrand)) ||
-    (compactReversedBrand.length >= 8 && compactHaystack.includes(compactReversedBrand))
+    containsPhrase(haystack, reversedBrand) ||
+    (compactBrand.length >= 6 && !normalizedBrand.includes(" ") && (words.has(compactBrand) || urlCompact.includes(compactBrand)))
   ) {
     return true;
   }
@@ -143,11 +151,7 @@ export function isBrandMentioned(result: SerpMentionResult, brandName: string, a
     const compactAlias = compactText(alias);
     const aliasTokens = distinctiveTokens(alias);
 
-    if (
-      aliasTokens.length >= 2 &&
-      normalizedAlias &&
-      (containsPhrase(haystack, normalizedAlias) || (compactAlias.length >= 8 && compactHaystack.includes(compactAlias)))
-    ) {
+    if (aliasTokens.length >= 2 && normalizedAlias && containsPhrase(haystack, normalizedAlias)) {
       return true;
     }
 
@@ -155,8 +159,8 @@ export function isBrandMentioned(result: SerpMentionResult, brandName: string, a
       return true;
     }
 
-    if (aliasTokens.length === 1 && aliasTokens[0].length >= 8) {
-      return words.has(aliasTokens[0]) || compactHaystack.includes(aliasTokens[0]);
+    if (aliasTokens.length === 1 && aliasTokens[0].length >= 6) {
+      return words.has(aliasTokens[0]) || urlCompact.includes(aliasTokens[0]);
     }
 
     return false;
@@ -166,7 +170,7 @@ export function isBrandMentioned(result: SerpMentionResult, brandName: string, a
 export function isRelevantOpportunity(result: SerpMentionResult, terms: string[]) {
   const rawHaystack = `${result.title} ${result.snippet} ${result.url}`;
   const haystack = normalizeText(rawHaystack);
-  const compactHaystack = compactText(rawHaystack);
+  const urlCompact = compactUrl(result.url);
   const words = wordSet(rawHaystack);
 
   return terms.some((term) => {
@@ -178,7 +182,10 @@ export function isRelevantOpportunity(result: SerpMentionResult, terms: string[]
       return false;
     }
 
-    if (containsPhrase(haystack, normalizedTerm) || (compactTerm.length >= 8 && compactHaystack.includes(compactTerm))) {
+    if (
+      containsPhrase(haystack, normalizedTerm) ||
+      (compactTerm.length >= 6 && !normalizedTerm.includes(" ") && (words.has(compactTerm) || urlCompact.includes(compactTerm)))
+    ) {
       return true;
     }
 
@@ -186,7 +193,7 @@ export function isRelevantOpportunity(result: SerpMentionResult, terms: string[]
       return true;
     }
 
-    return termTokens.length === 1 && termTokens[0].length >= 8 && words.has(termTokens[0]);
+    return termTokens.length === 1 && termTokens[0].length >= 8 && (words.has(termTokens[0]) || urlCompact.includes(termTokens[0]));
   });
 }
 
@@ -239,5 +246,5 @@ export async function searchRedditWithSerpApi(query: string): Promise<SerpMentio
       sourceQuery: query,
       subreddit: extractSubreddit(item.link || ""),
     }))
-    .filter((item: SerpMentionResult) => item.url.includes("reddit.com"));
+    .filter((item: SerpMentionResult) => /reddit\.com\/r\//i.test(item.url));
 }
